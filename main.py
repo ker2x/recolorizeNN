@@ -10,7 +10,7 @@ from tensorflow.keras.utils import plot_model
 EPOCHS = 32
 LR = 0.0003
 BATCH_SIZE = 5
-DATASET_SIZE = 500  #Set to 0 for all data
+DATASET_SIZE = 100  #Set to 0 for all data
 
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -53,29 +53,33 @@ model = tf.keras.Sequential()
 model.add(tf.keras.layers.Conv2D(16, (3, 3), activation='swish', padding='same', strides=1, data_format="channels_last",
                                  input_shape=(128, 128, 3)))
 model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='swish', padding='same', strides=1))
-#model.add(tf.keras.layers.MaxPool2D(2,2)) # divide the image by 2
+model.add(tf.keras.layers.MaxPool2D(2,2)) # divide the image by 2
 model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='swish', padding='same', strides=1))
-#model.add(tf.keras.layers.Dropout(0.1)) # randomly drop some neurons
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='swish', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='swish', padding='same', strides=1))
+model.add(tf.keras.layers.Dropout(0.1)) # randomly drop some neurons
+model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='swish', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='swish', padding='same', strides=1))
 
+model.add(tf.keras.layers.Conv2DTranspose(256, kernel_size=3, strides=1, activation='swish', padding='same'))
+model.add(tf.keras.layers.Conv2DTranspose(128, kernel_size=3, strides=1, activation='swish', padding='same'))
+model.add(tf.keras.layers.UpSampling2D((2,2))) # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='swish', padding='same'))
+#model.add(tf.keras.layers.UpSampling2D((2,2))) # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='swish', padding='same'))
-#model.add(tf.keras.layers.UpSampling2D((2,2))) # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='swish', padding='same'))
-#model.add(tf.keras.layers.UpSampling2D((2,2))) # rescale x2
-model.add(tf.keras.layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='swish', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(8, kernel_size=3, strides=1, activation='swish', padding='same'))
 
 model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation='relu', padding='same', data_format="channels_last"))
+
+#layer = model.layers
+#filters, biases = model.layers[1].get_weights()
+#print(layer[1].name, filters.shape)
 
 model.compile(loss=tf.keras.losses.MeanSquaredError(),
               optimizer=tf.keras.optimizers.Adam(learning_rate=LR),
               metrics=["accuracy", "mae", "mse"]
               )
 
-#history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
-history = model.fit(ds, shuffle=True, epochs=EPOCHS)
+history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
+#history = model.fit(ds, shuffle=True, epochs=EPOCHS)
 
 hist = pd.DataFrame(history.history)
 hist['epoch'] = history.epoch
