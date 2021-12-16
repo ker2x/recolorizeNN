@@ -7,11 +7,13 @@ import pandas as pd
 from skimage.color import rgb2lab, lab2rgb, rgb2ycbcr, ycbcr2rgb
 from tensorflow.keras.utils import plot_model
 
-EPOCHS = 32
+EPOCHS = 8
 #LR = 0.0002
-LR =  0.0002
-BATCH_SIZE = 1
-DATASET_SIZE = 256 #Set to 0 for all data
+LR =  0.0003
+BATCH_SIZE = 2
+DATASET_SIZE = 0 #Set to 0 for all data
+
+#tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -41,10 +43,11 @@ def process_image(file_path):
     return bw, color
 
 image_ds = ds_list.map(process_image)
+#image_ds = image_ds0.cache() # cache in memory (!!!)
 
-
-image_tensors = image_ds.batch(BATCH_SIZE)
+image_tensors = image_ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = image_tensors.prefetch(buffer_size = tf.data.AUTOTUNE)
+
 
 model = tf.keras.Sequential()
 #model.add(tf.keras.layers.DepthwiseConv2D((3, 3), activation='tanh', padding='same', strides=1))
@@ -55,12 +58,12 @@ model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', 
 model.add(tf.keras.layers.Dropout(0.5)) # randomly drop some neurons
 model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
 model.add(tf.keras.layers.MaxPool2D(2,2)) # divide the image by 2
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
 #model.add(tf.keras.layers.MaxPool2D(2,2)) # divide the image by 2
 #model.add(tf.keras.layers.Conv2D(256, (6, 6), activation='swish', padding='same', strides=1))
 
 #model.add(tf.keras.layers.Conv2DTranspose(256, kernel_size=6, strides=1, activation='swish', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(128, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu', padding='same'))
 model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu', padding='same'))
 model.add(tf.keras.layers.UpSampling2D((2,2))) # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'))
@@ -79,7 +82,7 @@ model.compile(loss=tf.keras.losses.MeanSquaredError(),
               )
 
 #history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
-history = model.fit(ds, shuffle=True, epochs=EPOCHS)
+history = model.fit(ds, shuffle=False, epochs=EPOCHS)
 
 hist = pd.DataFrame(history.history)
 hist['epoch'] = history.epoch
@@ -92,7 +95,7 @@ def plot_loss(history):
     plt.plot(history.history['loss'], label='training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.ylim((0, 0.015))
+    plt.ylim((0, 0.01))
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -101,7 +104,7 @@ def plot_loss(history):
 plot_loss(history)
 
 # show model
-model.summary()
+#model.summary()
 #plot_model(model, "model.png", show_shapes=True, show_dtype=True)
 
 # get input image
