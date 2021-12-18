@@ -52,7 +52,7 @@ ds = image_tensors.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 model = tf.keras.Sequential()
 #input
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
+model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=2, data_format="channels_last",
                                  input_shape=(128, 128, 3)))
 
 #encoder
