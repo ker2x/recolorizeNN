@@ -10,7 +10,7 @@ start = time.time()
 
 EPOCHS = 64
 # LR = 0.0002
-LR = 0.0002
+LR = 0.0003
 BATCH_SIZE = 4
 DATASET_SIZE = 128  # Set to 0 for all data
 
@@ -51,25 +51,28 @@ image_tensors = image_ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = image_tensors.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 model = tf.keras.Sequential()
-# model.add(tf.keras.layers.DepthwiseConv2D((3, 3), activation='tanh', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(16, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
+#input
+model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
                                  input_shape=(128, 128, 3)))
 
-model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Dropout(0.5))  # randomly drop some neurons
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.MaxPool2D(2, 2))  # divide the image by 2
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
-# model.add(tf.keras.layers.MaxPool2D(2,2)) # divide the image by 2
-# model.add(tf.keras.layers.Conv2D(256, (6, 6), activation='swish', padding='same', strides=1))
+#encoder
+model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=2))
+model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2))
+model.add(tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1))
 
-# model.add(tf.keras.layers.Conv2DTranspose(256, kernel_size=6, strides=1, activation='swish', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu', padding='same'))
+# decoder
+model.add(tf.keras.layers.Conv2DTranspose(128, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu', padding='same'))
 model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
 model.add(tf.keras.layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'))
 model.add(tf.keras.layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(8, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.Conv2DTranspose(3, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
 
 model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation="tanh", padding='same', data_format="channels_last"))
 
