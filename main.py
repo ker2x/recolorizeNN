@@ -4,6 +4,8 @@ import pathlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 import time
 
 #tf.config.set_visible_devices([], 'GPU')
@@ -11,11 +13,11 @@ import time
 
 start = time.time()
 
-EPOCHS = 64
+EPOCHS = 16
 # LR = 0.0002
 LR =   0.0001
 BATCH_SIZE = 4
-DATASET_SIZE = 128  # Set to 0 for all data
+DATASET_SIZE = 64  # Set to 0 for all data
 
 # tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
@@ -52,30 +54,34 @@ ds = ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 
-model = tf.keras.Sequential()
+# model = tf.keras.Sequential()
 #input
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
-                                 input_shape=(128, 128, 3)))
+#input =  tf.keras.layers.Input(type_spec=tf.TensorSpec([BATCH_SIZE,128,128,3], dtype=tf.dtypes.float32))
+input =  tf.keras.layers.Input(shape=(128,128,3))
 
 #encoder
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=2))
-model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2))
-model.add(tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1))
+encoder = tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
+                                 )(input)
+encoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+encoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=2)(encoder)
+encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2)(encoder)
+encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1, name="test")(encoder)
 
 # decoder
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
-model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1))
-model.add(tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1))
+decoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
+decoder = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1)(decoder)
+decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
+decoder = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1)(decoder)
+decoder = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1)(decoder)
 
-model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation=None, padding='same', data_format="channels_last"))
+decoder = tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation=None, padding='same', data_format="channels_last")(decoder)
+
 #model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
+model = tf.keras.Model(inputs=input, outputs=decoder)
 
 # layer = model.layers
 # filters, biases = model.layers[1].get_weights()
@@ -86,6 +92,7 @@ model.compile(loss=tf.keras.losses.MeanSquaredError(),
 #              optimizer=tf.keras.optimizers.Adam(),
               metrics=["accuracy", "mae", "mse"]
               )
+model.summary()
 
 # history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
 history = model.fit(ds, shuffle=False, epochs=EPOCHS)
