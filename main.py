@@ -13,11 +13,11 @@ import time
 
 start = time.time()
 
-EPOCHS = 16
+EPOCHS = 64
 # LR = 0.0002
 LR =   0.0001
 BATCH_SIZE = 4
-DATASET_SIZE = 64  # Set to 0 for all data
+DATASET_SIZE = 128  # Set to 0 for all data
 
 # tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
@@ -34,6 +34,8 @@ ds_list = tf.data.Dataset.list_files(str(datadir / '0*.jpg'), shuffle=True)
 if DATASET_SIZE != 0:
     ds_list = ds_list.take(DATASET_SIZE)
 
+val_ds_list = tf.data.Dataset.list_files(str(datadir / '0*.jpg'), shuffle=True).take(16)
+
 def process_image(_file_path):
     file = tf.io.read_file(_file_path)
     color = tf.image.decode_jpeg(file, channels=3)
@@ -49,6 +51,7 @@ def process_image(_file_path):
 
 
 ds = ds_list.map(process_image, num_parallel_calls=tf.data.AUTOTUNE)
+val_ds = val_ds_list.map(process_image).batch(4).prefetch(4)
 #ds = ds.cache("cache{}".format(DATASET_SIZE))
 ds = ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
@@ -95,7 +98,7 @@ model.compile(loss=tf.keras.losses.MeanSquaredError(),
 model.summary()
 
 # history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
-history = model.fit(ds, shuffle=False, epochs=EPOCHS)
+history = model.fit(ds, shuffle=False, epochs=EPOCHS, validation_data=val_ds)
 
 hist = pd.DataFrame(history.history)
 hist['epoch'] = history.epoch
@@ -104,7 +107,7 @@ hist.tail()
 
 def plot_loss(_history):
     plt.figure(1)
-    #    plt.plot(history.history['val_loss'], label='validation loss')
+    plt.plot(history.history['val_loss'], label='validation loss')
     plt.plot(_history.history['loss'], label='training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
