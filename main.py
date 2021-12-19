@@ -6,11 +6,14 @@ import pandas as pd
 import tensorflow as tf
 import time
 
+#tf.config.set_visible_devices([], 'GPU')
+
+
 start = time.time()
 
 EPOCHS = 64
 # LR = 0.0002
-LR = 0.0003
+LR =   0.0001
 BATCH_SIZE = 4
 DATASET_SIZE = 128  # Set to 0 for all data
 
@@ -29,12 +32,11 @@ ds_list = tf.data.Dataset.list_files(str(datadir / '0*.jpg'), shuffle=True)
 if DATASET_SIZE != 0:
     ds_list = ds_list.take(DATASET_SIZE)
 
-
 def process_image(_file_path):
     file = tf.io.read_file(_file_path)
     color = tf.image.decode_jpeg(file, channels=3)
-    color = tf.image.random_flip_left_right(color)
-    color = tf.image.random_flip_up_down(color)
+#    color = tf.image.random_flip_left_right(color)
+#    color = tf.image.random_flip_up_down(color)
     #    color = tf.image.resize(color, (128, 128))
     bw = tf.image.rgb_to_grayscale(color)
     bw = tf.broadcast_to(bw, [128, 128, 3])
@@ -44,15 +46,15 @@ def process_image(_file_path):
     return bw, color
 
 
-image_ds = ds_list.map(process_image)
-# image_ds = image_ds0.cache() # cache in memory (!!!)
+ds = ds_list.map(process_image, num_parallel_calls=tf.data.AUTOTUNE)
+#ds = ds.cache("cache{}".format(DATASET_SIZE))
+ds = ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
+ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
-image_tensors = image_ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
-ds = image_tensors.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 model = tf.keras.Sequential()
 #input
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=2, data_format="channels_last",
+model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
                                  input_shape=(128, 128, 3)))
 
 #encoder
@@ -65,16 +67,15 @@ model.add(tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same',
 model.add(tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1))
 
 # decoder
-model.add(tf.keras.layers.Conv2DTranspose(128, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1))
 model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
-model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu', padding='same'))
+model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1))
 model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
-model.add(tf.keras.layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu', padding='same'))
-model.add(tf.keras.layers.Conv2DTranspose(3, kernel_size=3, strides=1, activation='relu', padding='same'))
-model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
+model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1))
+model.add(tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1))
 
-model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation="tanh", padding='same', data_format="channels_last"))
+model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation=None, padding='same', data_format="channels_last"))
+#model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
 
 # layer = model.layers
 # filters, biases = model.layers[1].get_weights()
@@ -82,6 +83,7 @@ model.add(tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation="tanh", paddi
 
 model.compile(loss=tf.keras.losses.MeanSquaredError(),
               optimizer=tf.keras.optimizers.Adam(learning_rate=LR),
+#              optimizer=tf.keras.optimizers.Adam(),
               metrics=["accuracy", "mae", "mse"]
               )
 
