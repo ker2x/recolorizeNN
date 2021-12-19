@@ -13,7 +13,7 @@ import time
 
 start = time.time()
 
-EPOCHS = 64
+EPOCHS = 128
 # LR = 0.0002
 LR =   0.0001
 BATCH_SIZE = 4
@@ -57,10 +57,11 @@ ds = ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 
-# model = tf.keras.Sequential()
 #input
-#input =  tf.keras.layers.Input(type_spec=tf.TensorSpec([BATCH_SIZE,128,128,3], dtype=tf.dtypes.float32))
 input =  tf.keras.layers.Input(shape=(128,128,3))
+
+encoder2 = tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
+                                 name="encoder2")(input)
 
 #encoder
 encoder = tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
@@ -71,13 +72,14 @@ encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same',
 encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2)(encoder)
 encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
 encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1, name="test")(encoder)
+encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1)(encoder)
 
 # decoder
 decoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder)
 decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
 decoder = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1)(decoder)
 decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
+decoder = tf.keras.layers.Concatenate()([decoder, encoder2])
 decoder = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1)(decoder)
 decoder = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1)(decoder)
 
@@ -121,7 +123,7 @@ plot_loss(history)
 
 # show model
 # model.summary()
-# plot_model(model, "model.png", show_shapes=True, show_dtype=True)
+tf.keras.utils.plot_model(model, "model.png", show_shapes=True, show_dtype=True)
 
 # get input image
 file_path = next(iter(ds_list))
