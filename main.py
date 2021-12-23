@@ -4,8 +4,6 @@ import pathlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
 import time
 
 #tf.config.set_visible_devices([], 'GPU')
@@ -13,16 +11,16 @@ import time
 
 start = time.time()
 
-EPOCHS = 128
+EPOCHS = 64
 # LR = 0.0002
-LR =   0.0001
-BATCH_SIZE = 4
+LR =   0.001
+BATCH_SIZE = 2
 DATASET_SIZE = 128  # Set to 0 for all data
 
 # tf.keras.mixed_precision.set_global_policy('mixed_float16')
-
-physical_devices = tf.config.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+#tf.config.set_visible_devices([], 'GPU')
+#physical_devices = tf.config.list_physical_devices('GPU')
+#tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 # disable_eager_execution()
 # print(tf.executing_eagerly())
@@ -41,17 +39,19 @@ def process_image(_file_path):
     color = tf.image.decode_jpeg(file, channels=3)
 #    color = tf.image.random_flip_left_right(color)
 #    color = tf.image.random_flip_up_down(color)
-    #    color = tf.image.resize(color, (128, 128))
+#    color = tf.image.resize(color, (128, 128))
     bw = tf.image.rgb_to_grayscale(color)
     bw = tf.broadcast_to(bw, [128, 128, 3])
     bw = tf.image.convert_image_dtype(bw, tf.dtypes.float32)
+#    tf.print(bw)
+    bw = tf.image.rgb_to_yiq(bw)
     color = tf.image.convert_image_dtype(color, tf.dtypes.float32)
     color = tf.image.rgb_to_yiq(color)
     return bw, color
 
 
 ds = ds_list.map(process_image, num_parallel_calls=tf.data.AUTOTUNE)
-val_ds = val_ds_list.map(process_image).batch(4).prefetch(4)
+val_ds = val_ds_list.map(process_image).batch(8).prefetch(4)
 #ds = ds.cache("cache{}".format(DATASET_SIZE))
 ds = ds.batch(BATCH_SIZE, num_parallel_calls=tf.data.AUTOTUNE)
 ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
@@ -60,30 +60,39 @@ ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 #input
 input =  tf.keras.layers.Input(shape=(128,128,3))
 
-encoder2 = tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
-                                 name="encoder2")(input)
-
+#encoder2 = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1, data_format="channels_last",
+#                                 name="encoder2")(input)
+#encoder3 = tf.keras.layers.Conv2D(256, (5, 5), activation='relu', padding='same', strides=4, data_format="channels_last",
+#                                 name="encoder3")(encoder2)
 #encoder
-encoder = tf.keras.layers.Conv2D(64, (3, 3), activation='tanh', padding='same', strides=1, data_format="channels_last",
+encoder1 = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1, data_format="channels_last",
                                  )(input)
-encoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-encoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=2)(encoder)
-encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2)(encoder)
-encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-encoder = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-encoder = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1)(encoder)
+encoder2 = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder1)
+encoder3 = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=2)(encoder2)
+encoder4 = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=1)(encoder3)
+encoder5 = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2)(encoder4)
+encoder6 = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder5)
+encoder6a = tf.keras.layers.Dropout(0.5)(encoder6)
+encoder7 = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=1)(encoder6a)
+encoder8 = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=2)(encoder7)
 
 # decoder
-decoder = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder)
-decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
-decoder = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1)(decoder)
-decoder = tf.keras.layers.UpSampling2D((2, 2))(decoder)  # rescale x2
-decoder = tf.keras.layers.Concatenate()([decoder, encoder2])
-decoder = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1)(decoder)
-decoder = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1)(decoder)
+decoder1 = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', strides=1)(encoder8)
+decoder1b = tf.keras.layers.UpSampling2D((2, 2))(decoder1)  # rescale x2
 
-decoder = tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation=None, padding='same', data_format="channels_last")(decoder)
+decoder2 = tf.keras.layers.Concatenate()([decoder1b, encoder6])
+decoder3 = tf.keras.layers.UpSampling2D((2, 2))(decoder2)  # rescale x2
+
+decoder4 = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same', strides=1)(decoder3)
+
+decoder4a = tf.keras.layers.Concatenate()([decoder4, encoder3])
+decoder5 = tf.keras.layers.UpSampling2D((2, 2))(decoder4a)  # rescale x2
+decoder6 = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1)(decoder5)
+
+#decoder7 = tf.keras.layers.Concatenate()([decoder6, encoder2])
+decoder8 = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1)(decoder6)
+
+decoder = tf.keras.layers.Conv2D(3, kernel_size=(3, 3), activation=None, padding='same', data_format="channels_last")(decoder8)
 
 #model.add(tf.keras.layers.UpSampling2D((2, 2)))  # rescale x2
 model = tf.keras.Model(inputs=input, outputs=decoder)
@@ -92,11 +101,16 @@ model = tf.keras.Model(inputs=input, outputs=decoder)
 # filters, biases = model.layers[1].get_weights()
 # print(layer[1].name, filters.shape)
 
-model.compile(loss=tf.keras.losses.MeanSquaredError(),
+model.compile(loss=tf.keras.losses.MeanAbsoluteError(),
               optimizer=tf.keras.optimizers.Adam(learning_rate=LR),
 #              optimizer=tf.keras.optimizers.Adam(),
               metrics=["accuracy", "mae", "mse"]
               )
+
+# load a saved model
+#model = tf.keras.models.load_model("models/recolorizeNN")
+
+
 model.summary()
 
 # history = model.fit(ds, batch_size=BATCH_SIZE, shuffle=True, epochs=EPOCHS)
@@ -113,7 +127,7 @@ def plot_loss(_history):
     plt.plot(_history.history['loss'], label='training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.ylim((0, 0.01))
+#    plt.ylim((0, 0.05))
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -134,6 +148,7 @@ img = image_ds.batch(1)
 # display original
 plt.figure(3)
 # out *= 255
+out = tf.image.yiq_to_rgb(out)
 plt.imshow(out)
 plt.show()
 
@@ -161,3 +176,6 @@ plt.show()
 # plt.show()
 
 print("elapsed : ", time.time() - start)
+
+#model.save("models/recolorizeNN-{}".format(time.time()))
+model.save("models/recolorizeNN")
